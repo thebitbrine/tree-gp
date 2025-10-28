@@ -17,10 +17,12 @@ A self-evolving system built in C that uses tree-based genetic programming to le
 - **Addition** (100% gen 0): Learn `a + b`
 - **CartPole** (90% in 10-50 gens): Balance pole on cart, discovers PD controller
 - **Maze Navigation** (solved in 20-50 gens): Navigate 5x5 maze with walls
+- **3-bit Parity** (100% in ~77 gens): Even parity using XOR operations
+- **6-bit Multiplexer** (partial, 75%): Address decoding with boolean logic
 
 ## Partially Solved
 
-- **Taxi-v3** (-192 fitness): Pick up and drop off passenger (work in progress)
+- **Taxi-v3** (~35 steps improvement): Pick up and drop off passenger (limited by temporal credit assignment)
 
 ## Building
 
@@ -34,7 +36,9 @@ make
 ./test_add          # Simple addition task
 ./test_cartpole     # CartPole balancing
 ./test_maze         # Maze navigation
-./test_taxi         # Taxi-v3 (hard)
+./test_parity       # 3-bit even parity (boolean logic)
+./test_mux          # 6-bit multiplexer (hard)
+./test_taxi         # Taxi-v3 (very hard, temporal credit assignment)
 ./test_adf          # ADF demonstration
 ./benchmark         # Performance benchmark
 ```
@@ -49,6 +53,7 @@ make
 ### Operations
 
 - Arithmetic: ADD, SUB, MUL, DIV, MOD
+- Boolean: AND, OR, XOR, NOT
 - I/O: INPUT, OUTPUT
 - Control: IF_GT, SEQ
 - Memory: MEM_READ, MEM_WRITE
