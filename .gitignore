@@ -6,5 +6,6 @@ test_sequence
 test_taxi
 test_adf
 test_mux
+test_parity
 benchmark
 analyze_solution

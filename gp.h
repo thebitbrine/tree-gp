@@ -22,6 +22,7 @@ typedef enum {
     // Boolean/Bitwise (Int, Int -> Int)
     OP_AND,          // Bitwise AND
     OP_OR,           // Bitwise OR
+    OP_XOR,          // Bitwise XOR
     OP_NOT,          // Bitwise NOT (unary)
 
     // Terminals (-> Int)

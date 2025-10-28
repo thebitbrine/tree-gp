@@ -14,6 +14,7 @@ OpInfo op_info[] = {
     {OP_MOD, "MOD", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
     {OP_AND, "AND", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
     {OP_OR, "OR", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_XOR, "XOR", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
     {OP_NOT, "NOT", 1, TYPE_INT, {TYPE_INT}},
     {OP_CONST, "CONST", 0, TYPE_INT, {}},
     {OP_INPUT, "INPUT", 0, TYPE_INT, {}},
@@ -159,7 +160,12 @@ static Node* create_random_tree(int depth, ValueType required_type, int num_inpu
     int n_ops = 0;
 
     // Collect operations that match required type
-    for (int i = 0; i < OP_COUNT - 1; i++) {  // Exclude OP_LIBRARY for now
+    // Exclude OP_LIBRARY, OP_FUNC_CALL, OP_PARAM (handled separately)
+    for (int i = 0; i < OP_COUNT; i++) {
+        OpType op = op_info[i].op;
+        if (op == OP_LIBRARY || op == OP_FUNC_CALL || op == OP_PARAM) {
+            continue;  // Skip these
+        }
         if (op_info[i].return_type == required_type) {
             ops[n_ops++] = op_info[i].op;
         }
@@ -256,6 +262,11 @@ int execute_node(Node* node, Context* ctx, Population* pop) {
             int a = execute_node(node->children[0], ctx, pop);
             int b = execute_node(node->children[1], ctx, pop);
             return a | b;
+        }
+        case OP_XOR: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return a ^ b;
         }
         case OP_NOT: {
             int a = execute_node(node->children[0], ctx, pop);
