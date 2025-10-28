@@ -19,6 +19,11 @@ typedef enum {
     OP_DIV,
     OP_MOD,
 
+    // Boolean/Bitwise (Int, Int -> Int)
+    OP_AND,          // Bitwise AND
+    OP_OR,           // Bitwise OR
+    OP_NOT,          // Bitwise NOT (unary)
+
     // Terminals (-> Int)
     OP_CONST,        // Constant value
     OP_INPUT,        // Read input[N]

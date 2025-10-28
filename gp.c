@@ -12,6 +12,9 @@ OpInfo op_info[] = {
     {OP_MUL, "MUL", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
     {OP_DIV, "DIV", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
     {OP_MOD, "MOD", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_AND, "AND", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_OR, "OR", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_NOT, "NOT", 1, TYPE_INT, {TYPE_INT}},
     {OP_CONST, "CONST", 0, TYPE_INT, {}},
     {OP_INPUT, "INPUT", 0, TYPE_INT, {}},
     {OP_OUTPUT, "OUTPUT", 1, TYPE_VOID, {TYPE_INT}},
@@ -243,6 +246,20 @@ int execute_node(Node* node, Context* ctx, Population* pop) {
             int a = execute_node(node->children[0], ctx, pop);
             int b = execute_node(node->children[1], ctx, pop);
             return (b != 0) ? (a % b) : 0;
+        }
+        case OP_AND: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return a & b;
+        }
+        case OP_OR: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return a | b;
+        }
+        case OP_NOT: {
+            int a = execute_node(node->children[0], ctx, pop);
+            return ~a;
         }
         case OP_CONST:
             return node->value;
