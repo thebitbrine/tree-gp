@@ -1,0 +1,8 @@
+*.o
+test_add
+test_cartpole
+test_maze
+test_sequence
+test_taxi
+benchmark
+analyze_solution
