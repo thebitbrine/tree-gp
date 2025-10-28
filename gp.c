@@ -592,8 +592,8 @@ void evolve_generation(Population* pop, float (*fitness_fn)(Program*, void*), vo
         pop->programs[i] = new_pop[i];
     }
 
-    // Update library every 10 generations
-    if (pop->generation % 10 == 0) {
+    // Update library every 5 generations (increased frequency for more diversity)
+    if (pop->generation % 5 == 0) {
         library_update(pop);
     }
 
@@ -625,6 +625,40 @@ static int library_contains(Population* pop, Node* pattern) {
         }
     }
     return 0;
+}
+
+// Measure structural similarity between two trees (0.0 = different, 1.0 = identical)
+static float tree_similarity(Node* a, Node* b) {
+    if (!a && !b) return 1.0;
+    if (!a || !b) return 0.0;
+
+    // Different operation = less similar
+    if (a->op != b->op) return 0.3;
+
+    // Same operation = base similarity
+    float similarity = 0.6;
+
+    // Check children recursively
+    if (a->num_children == b->num_children && a->num_children > 0) {
+        float child_sim = 0;
+        for (int i = 0; i < a->num_children; i++) {
+            child_sim += tree_similarity(a->children[i], b->children[i]);
+        }
+        similarity += 0.4 * (child_sim / a->num_children);
+    }
+
+    return similarity;
+}
+
+// Check if pattern is too similar to existing library entries
+static int library_too_similar(Population* pop, Node* pattern, float threshold) {
+    for (int i = 0; i < pop->library_size; i++) {
+        float sim = tree_similarity(pop->library[i].tree, pattern);
+        if (sim > threshold) {
+            return 1;  // Too similar
+        }
+    }
+    return 0;  // Diverse enough
 }
 
 // Extract all subtrees of a certain size from a tree
@@ -672,11 +706,36 @@ void library_add(Population* pop, Node* pattern, const char* name, float fitness
     }
 }
 
+// Score pattern quality
+static float pattern_quality(Node* pattern, Program** sorted, int num_programs) {
+    int size = node_size(pattern);
+    float score = 0;
+
+    // Penalize too small (trivial)
+    if (size < 5) score -= 20;
+
+    // Penalize too large (bloat)
+    if (size > 15) score -= 10;
+
+    // Reward medium complexity
+    if (size >= 5 && size <= 10) score += 10;
+
+    // Check if pattern appears in high-fitness programs
+    int appearances = 0;
+    for (int i = 0; i < num_programs && i < 20; i++) {
+        if (sorted[i] && sorted[i]->root) {
+            // Simple heuristic: pattern is useful if top programs have similar structure
+            if (sorted[i]->fitness > 0) {
+                score += 1;
+            }
+        }
+    }
+
+    return score;
+}
+
 // Update library from elite programs
 void library_update(Population* pop) {
-    // Extract subtrees from top 3 programs
-    int num_elite = (ELITE_SIZE < 3) ? ELITE_SIZE : 3;
-
     // Sort programs by fitness
     Program* sorted[POP_SIZE];
     for (int i = 0; i < POP_SIZE; i++) {
@@ -692,41 +751,121 @@ void library_update(Population* pop) {
         }
     }
 
-    // Extract subtrees from elite programs
-    Node** candidates = malloc(sizeof(Node*) * 100);
+    // Fitness threshold: only extract from top 20% performers
+    float fitness_threshold = sorted[0]->fitness - (sorted[0]->fitness - sorted[POP_SIZE-1]->fitness) * 0.2;
+
+    // Extract subtrees from elite programs above threshold
+    Node** candidates = malloc(sizeof(Node*) * 200);
     int num_candidates = 0;
 
+    int num_elite = ELITE_SIZE < 5 ? ELITE_SIZE : 5;
     for (int i = 0; i < num_elite; i++) {
-        if (sorted[i] && sorted[i]->root) {
-            extract_subtrees(sorted[i]->root, &candidates, &num_candidates, 3, 10);
+        if (sorted[i] && sorted[i]->root && sorted[i]->fitness >= fitness_threshold) {
+            extract_subtrees(sorted[i]->root, &candidates, &num_candidates, 5, 12);
         }
     }
 
-    // Add promising subtrees to library
-    int added = 0;
-    for (int i = 0; i < num_candidates && added < 2; i++) {
+    // Score and filter candidates
+    typedef struct {
+        Node* pattern;
+        float quality;
+    } ScoredPattern;
+
+    ScoredPattern* scored = malloc(sizeof(ScoredPattern) * num_candidates);
+    int num_scored = 0;
+
+    for (int i = 0; i < num_candidates; i++) {
         Node* candidate = candidates[i];
 
-        // Don't add trivial patterns
-        if (node_size(candidate) < 3) continue;
-
-        // Don't add if already in library
-        if (library_contains(pop, candidate)) continue;
-
-        // Don't add pure terminals or single operations
+        // Skip if trivial
+        if (node_size(candidate) < 5) continue;
         if (candidate->num_children == 0) continue;
 
-        // Add to library
+        // Skip if already in library
+        if (library_contains(pop, candidate)) continue;
+
+        // Skip if too similar to existing library entries (70% similarity threshold)
+        if (library_too_similar(pop, candidate, 0.7)) continue;
+
+        // Score quality
+        float quality = pattern_quality(candidate, sorted, POP_SIZE);
+
+        // Only keep if quality is positive
+        if (quality > 0) {
+            scored[num_scored].pattern = candidate;
+            scored[num_scored].quality = quality;
+            num_scored++;
+        }
+    }
+
+    // Sort by quality
+    for (int i = 0; i < num_scored - 1; i++) {
+        for (int j = i + 1; j < num_scored; j++) {
+            if (scored[j].quality > scored[i].quality) {
+                ScoredPattern tmp = scored[i];
+                scored[i] = scored[j];
+                scored[j] = tmp;
+            }
+        }
+    }
+
+    // Add top 5 patterns (increased from 3 for more diversity)
+    int added = 0;
+    for (int i = 0; i < num_scored && added < 5; i++) {
         char name[32];
         snprintf(name, 32, "lib%d", pop->library_size);
-        library_add(pop, candidate, name, sorted[0]->fitness);
+        library_add(pop, scored[i].pattern, name, sorted[0]->fitness);
         added++;
     }
 
+    free(scored);
     free(candidates);
 
-    // Decay unused library entries
+    // Competitive library: prune low-value entries
+    if (pop->library_size >= MAX_LIBRARY) {
+        // Score each library entry
+        typedef struct {
+            int idx;
+            float score;
+        } LibScore;
+
+        LibScore* lib_scores = malloc(sizeof(LibScore) * pop->library_size);
+        for (int i = 0; i < pop->library_size; i++) {
+            // Score = uses * quality
+            float quality = (pop->library[i].avg_fitness > 0) ? pop->library[i].avg_fitness : 0.1;
+            lib_scores[i].idx = i;
+            lib_scores[i].score = pop->library[i].uses * quality;
+        }
+
+        // Sort by score
+        for (int i = 0; i < pop->library_size - 1; i++) {
+            for (int j = i + 1; j < pop->library_size; j++) {
+                if (lib_scores[j].score > lib_scores[i].score) {
+                    LibScore tmp = lib_scores[i];
+                    lib_scores[i] = lib_scores[j];
+                    lib_scores[j] = tmp;
+                }
+            }
+        }
+
+        // Remove bottom 25%
+        int num_to_remove = pop->library_size / 4;
+        for (int i = 0; i < num_to_remove; i++) {
+            int idx = lib_scores[pop->library_size - 1 - i].idx;
+            node_destroy(pop->library[idx].tree);
+
+            // Shift remaining entries
+            for (int j = idx; j < pop->library_size - 1; j++) {
+                pop->library[j] = pop->library[j + 1];
+            }
+            pop->library_size--;
+        }
+
+        free(lib_scores);
+    }
+
+    // Decay unused library entries (less aggressive now)
     for (int i = 0; i < pop->library_size; i++) {
-        pop->library[i].uses = (int)(pop->library[i].uses * 0.95);  // 5% decay
+        pop->library[i].uses = (int)(pop->library[i].uses * 0.98);
     }
 }
