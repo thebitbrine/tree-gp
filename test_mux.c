@@ -198,8 +198,8 @@ int main() {
             break;
         }
 
-        if (no_improvement > 100) {
-            printf("\nNo improvement for 100 generations.\n");
+        if (no_improvement > 500) {
+            printf("\nNo improvement for 500 generations.\n");
             break;
         }
     }

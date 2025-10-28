@@ -75,7 +75,7 @@ typedef enum {
 #define MAX_DEPTH 10
 #define MAX_CHILDREN 4
 #define MAX_LIBRARY 32
-#define MAX_INPUTS 8
+#define MAX_INPUTS 16  // Increased for 11-bit mux and larger problems
 #define MAX_OUTPUTS 8
 #define MAX_MEMORY 8
 
