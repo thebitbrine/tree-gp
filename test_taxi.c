@@ -112,10 +112,9 @@ float evaluate_taxi(Program* prog, void* data) {
         Context ctx = {0};
         int episode_reward = 0;
 
-        int initial_pass_dist = abs(state.taxi_row - LOCS[state.pass_loc][0]) +
-                                abs(state.taxi_col - LOCS[state.pass_loc][1]);
-        int min_pass_dist = initial_pass_dist;
-        int min_dest_dist = 999;
+        // Track best distances achieved (for progress-based rewards)
+        int best_pass_dist = 999;
+        int best_dest_dist = 999;
         int picked_up = 0;
 
         for (int step = 0; step < MAX_STEPS; step++) {
@@ -147,38 +146,27 @@ float evaluate_taxi(Program* prog, void* data) {
             int done = taxi_step(&state, action, &reward);
             episode_reward += reward;
 
-            // Reward shaping based on actual distance reduction (not just any reduction)
+            // Progress-based reward shaping: only reward when beating best distance
             if (state.pass_loc < 4) {
-                // Not picked up yet - reward based on distance to passenger
-                int pass_dist = abs(state.taxi_row - LOCS[state.pass_loc][0]) +
+                // Before pickup: reward progress toward passenger
+                int curr_dist = abs(state.taxi_row - LOCS[state.pass_loc][0]) +
                                 abs(state.taxi_col - LOCS[state.pass_loc][1]);
-
-                // Reward proportional to how close we are (inverse distance)
-                int max_dist = 8;  // Max Manhattan distance in 5x5 grid
-                episode_reward += (max_dist - pass_dist);
-
-                if (pass_dist < min_pass_dist) {
-                    min_pass_dist = pass_dist;
+                if (curr_dist < best_pass_dist) {
+                    episode_reward += 5;  // Reward for progress
+                    best_pass_dist = curr_dist;
                 }
             } else {
-                // Passenger picked up
+                // After pickup
                 if (!picked_up) {
-                    episode_reward += 50;  // Bonus for successful pickup
+                    episode_reward += 50;  // Big bonus for successful pickup
                     picked_up = 1;
-                    min_dest_dist = abs(state.taxi_row - LOCS[state.dest_loc][0]) +
-                                    abs(state.taxi_col - LOCS[state.dest_loc][1]);
                 }
-
-                // Reward based on distance to destination
-                int dest_dist = abs(state.taxi_row - LOCS[state.dest_loc][0]) +
+                // Reward progress toward destination
+                int curr_dist = abs(state.taxi_row - LOCS[state.dest_loc][0]) +
                                 abs(state.taxi_col - LOCS[state.dest_loc][1]);
-
-                // Reward proportional to how close we are (inverse distance)
-                int max_dist = 8;
-                episode_reward += (max_dist - dest_dist);
-
-                if (dest_dist < min_dest_dist) {
-                    min_dest_dist = dest_dist;
+                if (curr_dist < best_dest_dist) {
+                    episode_reward += 5;  // Reward for progress
+                    best_dest_dist = curr_dist;
                 }
             }
 
@@ -223,7 +211,7 @@ int main() {
             no_improvement++;
         }
 
-        if (gen % 100 == 0 || pop->best_fitness >= 7.0f) {
+        if (gen % 100 == 0 || pop->best_fitness >= -100.0f) {
             printf("Gen %4d: Best=%.1f Avg=%.1f Size=%d Lib=%d\n",
                    gen,
                    pop->best_fitness,
@@ -232,7 +220,7 @@ int main() {
                    pop->library_size);
         }
 
-        if (pop->best_fitness >= 50.0f) {
+        if (pop->best_fitness >= 0.0f) {
             printf("\n*** GOOD SOLUTION FOUND! ***\n");
             printf("Final fitness: %.1f\n", pop->best_fitness);
             printf("Solution size: %d nodes\n", pop->best->size);
