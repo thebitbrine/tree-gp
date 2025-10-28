@@ -147,27 +147,37 @@ float evaluate_taxi(Program* prog, void* data) {
             int done = taxi_step(&state, action, &reward);
             episode_reward += reward;
 
-            // Reward shaping
+            // Reward shaping based on actual distance reduction (not just any reduction)
             if (state.pass_loc < 4) {
-                // Not picked up yet - reward getting closer to passenger
+                // Not picked up yet - reward based on distance to passenger
                 int pass_dist = abs(state.taxi_row - LOCS[state.pass_loc][0]) +
                                 abs(state.taxi_col - LOCS[state.pass_loc][1]);
+
+                // Reward proportional to how close we are (inverse distance)
+                int max_dist = 8;  // Max Manhattan distance in 5x5 grid
+                episode_reward += (max_dist - pass_dist);
+
                 if (pass_dist < min_pass_dist) {
-                    episode_reward += 2;
                     min_pass_dist = pass_dist;
                 }
             } else {
-                // Picked up - reward getting closer to destination
+                // Passenger picked up
                 if (!picked_up) {
-                    episode_reward += 30;  // Big bonus for successful pickup
+                    episode_reward += 50;  // Bonus for successful pickup
                     picked_up = 1;
                     min_dest_dist = abs(state.taxi_row - LOCS[state.dest_loc][0]) +
                                     abs(state.taxi_col - LOCS[state.dest_loc][1]);
                 }
+
+                // Reward based on distance to destination
                 int dest_dist = abs(state.taxi_row - LOCS[state.dest_loc][0]) +
                                 abs(state.taxi_col - LOCS[state.dest_loc][1]);
+
+                // Reward proportional to how close we are (inverse distance)
+                int max_dist = 8;
+                episode_reward += (max_dist - dest_dist);
+
                 if (dest_dist < min_dest_dist) {
-                    episode_reward += 2;
                     min_dest_dist = dest_dist;
                 }
             }
@@ -199,7 +209,7 @@ int main() {
 
     Population* pop = pop_create();
 
-    int max_gen = 500;
+    int max_gen = 2000;
     float best_ever = -INFINITY;
     int no_improvement = 0;
 
@@ -222,7 +232,7 @@ int main() {
                    pop->library_size);
         }
 
-        if (pop->best_fitness >= 7.0f) {
+        if (pop->best_fitness >= 50.0f) {
             printf("\n*** GOOD SOLUTION FOUND! ***\n");
             printf("Final fitness: %.1f\n", pop->best_fitness);
             printf("Solution size: %d nodes\n", pop->best->size);
