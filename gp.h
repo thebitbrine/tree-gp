@@ -107,9 +107,9 @@ typedef struct {
 } Program;
 
 // Population
-#define POP_SIZE 800
+#define POP_SIZE 2000  // Increased for harder problems
 #define TOURNAMENT_SIZE 7
-#define ELITE_SIZE 10
+#define ELITE_SIZE 20  // More elites with larger population
 
 typedef struct {
     Program* programs[POP_SIZE];
