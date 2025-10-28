@@ -7,7 +7,8 @@ A self-evolving system built in C that uses tree-based genetic programming to le
 - Tree-based program representation with typed operations
 - Multi-threaded fitness evaluation (9x speedup on 12 cores)
 - Memory operations for stateful programs
-- Library learning system that extracts and reuses successful patterns
+- Automatic ADF (Automatically Defined Functions) with parameterization
+- Library learning with diversity enforcement and quality scoring
 - Crossover and mutation operators with elitism
 - Tournament selection with parsimony pressure
 
@@ -34,6 +35,7 @@ make
 ./test_cartpole     # CartPole balancing
 ./test_maze         # Maze navigation
 ./test_taxi         # Taxi-v3 (hard)
+./test_adf          # ADF demonstration
 ./benchmark         # Performance benchmark
 ```
 
@@ -50,7 +52,8 @@ make
 - I/O: INPUT, OUTPUT
 - Control: IF_GT, SEQ
 - Memory: MEM_READ, MEM_WRITE
-- Library: LIB (calls learned patterns)
+- Library: LIB (non-parameterized patterns)
+- ADF: FUNC_CALL (parameterized functions), PARAM (function parameters)
 
 ### Evolution
 
@@ -58,7 +61,10 @@ make
 - Tournament selection (size 7)
 - Elitism (top 10 preserved)
 - 70% crossover, 30% mutation
-- Library update every 10 generations
+- Library update every 5 generations
+- Automatic parameterization of extracted patterns
+- Diversity enforcement (70% similarity threshold)
+- Quality scoring and competitive pruning
 
 ## Performance
 
