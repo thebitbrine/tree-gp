@@ -39,6 +39,10 @@ typedef enum {
     OP_MEM_READ,     // Read memory[N]
     OP_MEM_WRITE,    // Write value to memory[N]
 
+    // ADF (Automatically Defined Functions)
+    OP_FUNC_CALL,    // Call function with arguments
+    OP_PARAM,        // Reference parameter within function
+
     OP_COUNT
 } OpType;
 
@@ -59,12 +63,14 @@ typedef struct Node {
     struct Node* children[MAX_CHILDREN];
 } Node;
 
-// Library entry (learned patterns)
+// Library entry (learned patterns / ADF functions)
 typedef struct {
     char name[32];
     Node* tree;
     int uses;               // How many times it's been used successfully
     float avg_fitness;      // Average fitness of programs using it
+    int num_params;         // Number of parameters for ADF
+    ValueType param_types[MAX_CHILDREN];  // Parameter types
 } LibraryEntry;
 
 // Individual program
@@ -132,6 +138,11 @@ typedef struct {
     int outputs[MAX_OUTPUTS];
     int num_outputs;
     int memory[MAX_MEMORY];     // Persistent memory between executions
+
+    // ADF argument stack (for nested function calls)
+    int args[MAX_CHILDREN * 4];  // Stack for up to 4 levels of nesting with 4 args each
+    int arg_stack_ptr;           // Current position in argument stack
+    int arg_frame_base;          // Base of current function's arguments
 } Context;
 
 int execute_node(Node* node, Context* ctx, Population* pop);

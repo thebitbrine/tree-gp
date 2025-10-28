@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -O2 -g -pthread
 LDFLAGS = -lm -pthread
 
-all: test_add test_cartpole benchmark analyze_solution test_sequence test_maze test_taxi
+all: test_add test_cartpole benchmark analyze_solution test_sequence test_maze test_taxi test_adf
 
 test_add: test_add.c gp.c gp.h
 	$(CC) $(CFLAGS) -o test_add test_add.c gp.c $(LDFLAGS)
@@ -25,7 +25,10 @@ test_maze: test_maze.c gp.c gp.h
 test_taxi: test_taxi.c gp.c gp.h
 	$(CC) $(CFLAGS) -o test_taxi test_taxi.c gp.c $(LDFLAGS)
 
+test_adf: test_adf.c gp.c gp.h
+	$(CC) $(CFLAGS) -o test_adf test_adf.c gp.c $(LDFLAGS)
+
 clean:
-	rm -f test_add test_cartpole benchmark analyze_solution test_sequence test_maze test_taxi *.o
+	rm -f test_add test_cartpole benchmark analyze_solution test_sequence test_maze test_taxi test_adf *.o
 
 .PHONY: all clean

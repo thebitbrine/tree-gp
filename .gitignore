@@ -4,5 +4,6 @@ test_cartpole
 test_maze
 test_sequence
 test_taxi
+test_adf
 benchmark
 analyze_solution

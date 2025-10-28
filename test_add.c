@@ -38,34 +38,6 @@ float evaluate_add(Program* prog, void* data) {
     return fitness;
 }
 
-void print_tree(Node* node, int indent) {
-    if (!node) return;
-
-    for (int i = 0; i < indent; i++) printf("  ");
-
-    OpInfo* info = NULL;
-    for (int i = 0; i < OP_COUNT; i++) {
-        if (op_info[i].op == node->op) {
-            info = &op_info[i];
-            break;
-        }
-    }
-
-    if (info) {
-        printf("%s", info->name);
-        if (node->op == OP_CONST) {
-            printf("(%d)", node->value);
-        } else if (node->op == OP_INPUT) {
-            printf("[%d]", node->value);
-        }
-        printf("\n");
-
-        for (int i = 0; i < node->num_children; i++) {
-            print_tree(node->children[i], indent + 1);
-        }
-    }
-}
-
 int main() {
     srand(time(NULL));
 

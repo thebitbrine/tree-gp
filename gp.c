@@ -20,6 +20,8 @@ OpInfo op_info[] = {
     {OP_LIBRARY, "LIB", 0, TYPE_INT, {}},
     {OP_MEM_READ, "MEM_READ", 0, TYPE_INT, {}},
     {OP_MEM_WRITE, "MEM_WRITE", 1, TYPE_VOID, {TYPE_INT}},
+    {OP_FUNC_CALL, "FUNC", 0, TYPE_INT, {}},  // Variable arity, handled specially
+    {OP_PARAM, "PARAM", 0, TYPE_INT, {}},
 };
 
 // Helper: Get operation info
@@ -47,6 +49,12 @@ void print_tree(Node* node, int indent) {
             printf("[mem%d]", node->value);
         } else if (node->op == OP_MEM_WRITE) {
             printf("[mem%d]", node->value);
+        } else if (node->op == OP_LIBRARY) {
+            printf("[lib%d]", node->value);
+        } else if (node->op == OP_FUNC_CALL) {
+            printf("[func%d]", node->value);
+        } else if (node->op == OP_PARAM) {
+            printf("[p%d]", node->value);
         }
         printf("\n");
 
@@ -288,6 +296,43 @@ int execute_node(Node* node, Context* ctx, Population* pop) {
             }
             return 0;
         }
+        case OP_FUNC_CALL: {
+            int func_idx = node->value;
+            if (pop && func_idx >= 0 && func_idx < pop->library_size) {
+                LibraryEntry* func = &pop->library[func_idx];
+
+                // Save old frame state
+                int old_stack_ptr = ctx->arg_stack_ptr;
+                int old_frame_base = ctx->arg_frame_base;
+
+                // Evaluate arguments and push to stack
+                for (int i = 0; i < func->num_params && i < node->num_children; i++) {
+                    ctx->args[ctx->arg_stack_ptr++] = execute_node(node->children[i], ctx, pop);
+                }
+
+                // Set new frame base
+                ctx->arg_frame_base = old_stack_ptr;
+
+                // Execute function body
+                int result = execute_node(func->tree, ctx, pop);
+
+                // Restore frame state
+                ctx->arg_stack_ptr = old_stack_ptr;
+                ctx->arg_frame_base = old_frame_base;
+
+                return result;
+            }
+            return 0;
+        }
+        case OP_PARAM: {
+            int param_idx = node->value;
+            // Read from argument stack (offset from current frame base)
+            int arg_pos = ctx->arg_frame_base + param_idx;
+            if (arg_pos >= 0 && arg_pos < ctx->arg_stack_ptr) {
+                return ctx->args[arg_pos];
+            }
+            return 0;
+        }
         default:
             return 0;
     }
@@ -354,14 +399,35 @@ static void inject_library_calls(Node* node, Population* pop, int depth) {
     // Only replace INT-returning nodes (library entries return INT)
     if (rand() % 20 == 0 && info->return_type == TYPE_INT) {
         int lib_idx = rand() % pop->library_size;
-        node->op = OP_LIBRARY;
-        node->value = lib_idx;
-        // Destroy children since library is a terminal
-        for (int i = 0; i < node->num_children; i++) {
-            node_destroy(node->children[i]);
+        LibraryEntry* lib = &pop->library[lib_idx];
+
+        if (lib->num_params > 0) {
+            // Create parameterized function call
+            node->op = OP_FUNC_CALL;
+            node->value = lib_idx;
+
+            // Destroy old children
+            for (int i = 0; i < node->num_children; i++) {
+                node_destroy(node->children[i]);
+            }
+
+            // Create random argument expressions
+            node->num_children = lib->num_params;
+            for (int i = 0; i < lib->num_params; i++) {
+                node->children[i] = create_random_tree(depth + 1, TYPE_INT, pop->num_inputs);
+            }
+        } else {
+            // Non-parameterized library call
+            node->op = OP_LIBRARY;
+            node->value = lib_idx;
+            // Destroy children since library is a terminal
+            for (int i = 0; i < node->num_children; i++) {
+                node_destroy(node->children[i]);
+            }
+            node->num_children = 0;
         }
-        node->num_children = 0;
-        pop->library[lib_idx].uses++;
+
+        lib->uses++;
         return;
     }
 
@@ -678,8 +744,71 @@ static void extract_subtrees(Node* node, Node*** subtrees, int* count, int min_s
     }
 }
 
+// Detect unique INPUT indices used in a pattern
+static void detect_inputs(Node* node, int* input_map, int* num_params) {
+    if (!node) return;
+
+    if (node->op == OP_INPUT) {
+        int input_idx = node->value;
+        // Check if this input is already mapped
+        int found = 0;
+        for (int i = 0; i < *num_params; i++) {
+            if (input_map[i] == input_idx) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found && *num_params < MAX_CHILDREN) {
+            input_map[(*num_params)++] = input_idx;
+        }
+    }
+
+    for (int i = 0; i < node->num_children; i++) {
+        detect_inputs(node->children[i], input_map, num_params);
+    }
+}
+
+// Convert INPUT nodes to PARAM nodes based on input_map
+static Node* parameterize_pattern(Node* node, int* input_map, int num_params) {
+    if (!node) return NULL;
+
+    Node* result = node_create(node->op, node->value);
+    result->num_children = node->num_children;
+
+    if (node->op == OP_INPUT) {
+        // Replace INPUT with PARAM
+        int input_idx = node->value;
+        for (int i = 0; i < num_params; i++) {
+            if (input_map[i] == input_idx) {
+                result->op = OP_PARAM;
+                result->value = i;
+                break;
+            }
+        }
+    }
+
+    for (int i = 0; i < node->num_children; i++) {
+        result->children[i] = parameterize_pattern(node->children[i], input_map, num_params);
+    }
+
+    return result;
+}
+
 // Add pattern to library
 void library_add(Population* pop, Node* pattern, const char* name, float fitness) {
+    // Detect inputs and parameterize
+    int input_map[MAX_CHILDREN];
+    int num_params = 0;
+    detect_inputs(pattern, input_map, &num_params);
+
+    // Create parameterized version if inputs found
+    Node* parameterized = NULL;
+    if (num_params > 0) {
+        parameterized = parameterize_pattern(pattern, input_map, num_params);
+    } else {
+        parameterized = node_copy(pattern);
+    }
+
     if (pop->library_size >= MAX_LIBRARY) {
         // Library full - replace least used entry
         int min_uses = pop->library[0].uses;
@@ -693,16 +822,24 @@ void library_add(Population* pop, Node* pattern, const char* name, float fitness
         // Replace it
         node_destroy(pop->library[min_idx].tree);
         strncpy(pop->library[min_idx].name, name, 31);
-        pop->library[min_idx].tree = node_copy(pattern);
+        pop->library[min_idx].tree = parameterized;
         pop->library[min_idx].uses = 1;
         pop->library[min_idx].avg_fitness = fitness;
+        pop->library[min_idx].num_params = num_params;
+        for (int i = 0; i < num_params; i++) {
+            pop->library[min_idx].param_types[i] = TYPE_INT;
+        }
     } else {
         // Add new entry
         LibraryEntry* entry = &pop->library[pop->library_size++];
         strncpy(entry->name, name, 31);
-        entry->tree = node_copy(pattern);
+        entry->tree = parameterized;
         entry->uses = 1;
         entry->avg_fitness = fitness;
+        entry->num_params = num_params;
+        for (int i = 0; i < num_params; i++) {
+            entry->param_types[i] = TYPE_INT;
+        }
     }
 }
 
@@ -721,7 +858,6 @@ static float pattern_quality(Node* pattern, Program** sorted, int num_programs) 
     if (size >= 5 && size <= 10) score += 10;
 
     // Check if pattern appears in high-fitness programs
-    int appearances = 0;
     for (int i = 0; i < num_programs && i < 20; i++) {
         if (sorted[i] && sorted[i]->root) {
             // Simple heuristic: pattern is useful if top programs have similar structure
