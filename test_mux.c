@@ -12,7 +12,10 @@
 float evaluate_mux(Program* prog, void* data) {
     (void)data;
 
-    int correct = 0;
+    // Track correctness per address value (8 addresses)
+    int correct_per_address[8] = {0};
+    int total_per_address[8] = {0};
+
     int total = 2048;  // All 2^11 possible inputs
 
     for (int test = 0; test < total; test++) {
@@ -63,15 +66,26 @@ float evaluate_mux(Program* prog, void* data) {
 
         int result = (ctx.num_outputs > 0) ? (ctx.outputs[0] & 1) : 0;
 
+        total_per_address[address]++;
         if (result == expected) {
-            correct++;
+            correct_per_address[address]++;
         }
     }
 
-    float fitness = (float)correct;
+    // Fitness: reward each address case that's fully correct
+    float fitness = 0.0f;
+    for (int addr = 0; addr < 8; addr++) {
+        float addr_accuracy = (float)correct_per_address[addr] / total_per_address[addr];
+        // Full points if 100% correct for this address, partial credit otherwise
+        if (addr_accuracy >= 0.99f) {
+            fitness += 256.0f;  // Full credit for solving this address
+        } else {
+            fitness += addr_accuracy * 64.0f;  // Partial credit
+        }
+    }
 
     // Parsimony pressure
-    fitness -= prog->size * 0.01f;
+    fitness -= prog->size * 0.1f;
 
     return fitness;
 }
@@ -102,7 +116,7 @@ int main() {
             no_improvement++;
         }
 
-        if (gen % 10 == 0 || pop->best_fitness >= 2040.0f) {
+        if (gen % 10 == 0 || pop->best_fitness >= 2000.0f) {
             printf("Gen %4d: Best=%.1f Avg=%.1f Size=%d Lib=%d\n",
                    gen,
                    pop->best_fitness,
@@ -121,7 +135,7 @@ int main() {
             }
         }
 
-        if (pop->best_fitness >= 2040.0f) {
+        if (pop->best_fitness >= 2000.0f) {  // 8 addresses * 256 pts = 2048 max
             printf("\n*** SOLVED! ***\n");
             printf("Final fitness: %.1f / 2048.0\n", pop->best_fitness);
             printf("Solution size: %d nodes\n", pop->best->size);

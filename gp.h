@@ -72,7 +72,7 @@ typedef enum {
 } OpType;
 
 // Maximum tree depth and children
-#define MAX_DEPTH 10
+#define MAX_DEPTH 15  // Increased to allow more complex solutions
 #define MAX_CHILDREN 4
 #define MAX_LIBRARY 32
 #define MAX_INPUTS 16  // Increased for 11-bit mux and larger problems
