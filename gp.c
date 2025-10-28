@@ -16,10 +16,23 @@ OpInfo op_info[] = {
     {OP_OR, "OR", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
     {OP_XOR, "XOR", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
     {OP_NOT, "NOT", 1, TYPE_INT, {TYPE_INT}},
+    {OP_EQ, "EQ", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_LT, "LT", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_LTE, "LTE", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_ABS, "ABS", 1, TYPE_INT, {TYPE_INT}},
+    {OP_NEG, "NEG", 1, TYPE_INT, {TYPE_INT}},
+    {OP_MAX, "MAX", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_MIN, "MIN", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_GT, "GT", 2, TYPE_INT, {TYPE_INT, TYPE_INT}},
+    {OP_SIN, "SIN", 1, TYPE_INT, {TYPE_INT}},
+    {OP_TANH, "TANH", 1, TYPE_INT, {TYPE_INT}},
+    {OP_STEP, "STEP", 1, TYPE_INT, {TYPE_INT}},
+    {OP_IDENT, "IDENT", 1, TYPE_INT, {TYPE_INT}},
     {OP_CONST, "CONST", 0, TYPE_INT, {}},
     {OP_INPUT, "INPUT", 0, TYPE_INT, {}},
     {OP_OUTPUT, "OUTPUT", 1, TYPE_VOID, {TYPE_INT}},
     {OP_IF_GT, "IF_GT", 4, TYPE_INT, {TYPE_INT, TYPE_INT, TYPE_INT, TYPE_INT}},
+    {OP_IF, "IF", 3, TYPE_INT, {TYPE_INT, TYPE_INT, TYPE_INT}},
     {OP_SEQ, "SEQ", 2, TYPE_VOID, {TYPE_VOID, TYPE_VOID}},
     {OP_LIBRARY, "LIB", 0, TYPE_INT, {}},
     {OP_MEM_READ, "MEM_READ", 0, TYPE_INT, {}},
@@ -156,7 +169,7 @@ static Node* create_random_tree(int depth, ValueType required_type, int num_inpu
     }
 
     // Create non-terminal
-    OpType ops[10];
+    OpType ops[32];  // Enough for all operations
     int n_ops = 0;
 
     // Collect operations that match required type
@@ -272,6 +285,64 @@ int execute_node(Node* node, Context* ctx, Population* pop) {
             int a = execute_node(node->children[0], ctx, pop);
             return ~a;
         }
+        case OP_EQ: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return (a == b) ? 1 : 0;
+        }
+        case OP_LT: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return (a < b) ? 1 : 0;
+        }
+        case OP_LTE: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return (a <= b) ? 1 : 0;
+        }
+        case OP_ABS: {
+            int a = execute_node(node->children[0], ctx, pop);
+            return (a < 0) ? -a : a;
+        }
+        case OP_NEG: {
+            int a = execute_node(node->children[0], ctx, pop);
+            return -a;
+        }
+        case OP_MAX: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return (a > b) ? a : b;
+        }
+        case OP_MIN: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return (a < b) ? a : b;
+        }
+        case OP_GT: {
+            int a = execute_node(node->children[0], ctx, pop);
+            int b = execute_node(node->children[1], ctx, pop);
+            return (a > b) ? 1 : 0;
+        }
+        case OP_SIN: {
+            int a = execute_node(node->children[0], ctx, pop);
+            // Scale: a/100 radians, result *100
+            double rad = (double)a / 100.0;
+            return (int)(sin(rad) * 100.0);
+        }
+        case OP_TANH: {
+            int a = execute_node(node->children[0], ctx, pop);
+            // Scale: a/100, result *100
+            double x = (double)a / 100.0;
+            return (int)(tanh(x) * 100.0);
+        }
+        case OP_STEP: {
+            int a = execute_node(node->children[0], ctx, pop);
+            return (a > 0) ? 1 : 0;
+        }
+        case OP_IDENT: {
+            int a = execute_node(node->children[0], ctx, pop);
+            return a;
+        }
         case OP_CONST:
             return node->value;
         case OP_INPUT: {
@@ -295,6 +366,14 @@ int execute_node(Node* node, Context* ctx, Population* pop) {
                 return execute_node(node->children[2], ctx, pop);
             } else {
                 return execute_node(node->children[3], ctx, pop);
+            }
+        }
+        case OP_IF: {
+            int cond = execute_node(node->children[0], ctx, pop);
+            if (cond != 0) {
+                return execute_node(node->children[1], ctx, pop);
+            } else {
+                return execute_node(node->children[2], ctx, pop);
             }
         }
         case OP_SEQ: {

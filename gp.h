@@ -25,6 +25,24 @@ typedef enum {
     OP_XOR,          // Bitwise XOR
     OP_NOT,          // Bitwise NOT (unary)
 
+    // Comparison (Int, Int -> Int) - returns 1 or 0
+    OP_EQ,           // Equal
+    OP_LT,           // Less than
+    OP_LTE,          // Less than or equal
+
+    // Math (Int -> Int, or Int,Int -> Int)
+    OP_ABS,          // Absolute value (unary)
+    OP_NEG,          // Negate (unary)
+    OP_MAX,          // Maximum of two values
+    OP_MIN,          // Minimum of two values
+    OP_GT,           // Greater than
+
+    // Activation/Transfer functions (Int -> Int)
+    OP_SIN,          // Sine (scaled for integers)
+    OP_TANH,         // Hyperbolic tangent (scaled)
+    OP_STEP,         // Step function: 1 if x > 0, else 0
+    OP_IDENT,        // Identity/pass-through
+
     // Terminals (-> Int)
     OP_CONST,        // Constant value
     OP_INPUT,        // Read input[N]
@@ -34,6 +52,7 @@ typedef enum {
 
     // Control flow
     OP_IF_GT,        // If a > b then c else d (Int, Int, Int, Int -> Int)
+    OP_IF,           // If cond != 0 then a else b (Int, Int, Int -> Int)
 
     // Sequence (Void, Void -> Void)
     OP_SEQ,          // Execute two statements in sequence
