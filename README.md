@@ -50,15 +50,18 @@ make
 - `gp.h/gp.c` - Core GP system with tree operations, evolution, library learning
 - `test_*.c` - Task-specific fitness functions and environments
 
-### Operations
+### Operations (35 total)
 
-- Arithmetic: ADD, SUB, MUL, DIV, MOD
-- Boolean: AND, OR, XOR, NOT
-- I/O: INPUT, OUTPUT
-- Control: IF_GT, SEQ
-- Memory: MEM_READ, MEM_WRITE
-- Library: LIB (non-parameterized patterns)
-- ADF: FUNC_CALL (parameterized functions), PARAM (function parameters)
+- **Arithmetic**: ADD, SUB, MUL, DIV, MOD
+- **Boolean**: AND, OR, XOR, NOT
+- **Comparison**: EQ, LT, LTE, GT
+- **Math**: ABS, NEG, MAX, MIN
+- **Activation**: SIN, TANH, STEP, IDENT
+- **Control**: IF_GT, IF, SEQ
+- **I/O**: INPUT, OUTPUT, CONST
+- **Memory**: MEM_READ, MEM_WRITE
+- **Library**: LIB (non-parameterized patterns)
+- **ADF**: FUNC_CALL (parameterized functions), PARAM (function parameters)
 
 ### Evolution
 
